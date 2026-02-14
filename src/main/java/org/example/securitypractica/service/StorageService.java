@@ -20,6 +20,10 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 @Slf4j
 @Service
@@ -31,6 +35,8 @@ public class StorageService {
 
     @Value("${minio.bucket-name}")
     private String bucketName;
+
+    private final Executor storageExecutor = Executors.newFixedThreadPool(10); // Ограничим 10 потоками
 
     private String getUserRootPath(Long userId) {
         return "user-" + userId + "-files/";
@@ -81,7 +87,6 @@ public class StorageService {
         validateParentExists(normalizedPath, userId);
         String rootPath = getUserRootPath(userId);
         List<ResourceDto> results = new ArrayList<>();
-
         for (MultipartFile file : files) {
             String originalFilename = file.getOriginalFilename();
             if (originalFilename == null || originalFilename.isBlank()) continue;
@@ -134,7 +139,6 @@ public class StorageService {
 
         if (fullPath.endsWith("/")) {
             var items = minioRepository.list(fullPath, true);
-
             List<CompletableFuture<Void>> futures = new ArrayList<>();
 
             for (Result<Item> result : items) {
@@ -143,12 +147,14 @@ public class StorageService {
                         String objectName = result.get().objectName();
                         minioRepository.delete(objectName);
                     } catch (Exception e) {
-                        log.error("Failed to delete object: " + e.getMessage());
+                        log.error("Failed to delete object in folder {}: {}", fullPath, e.getMessage());
                     }
-                }));
-                CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+                }, storageExecutor));
             }
+
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
         }
+
         minioRepository.delete(fullPath);
     }
 
@@ -174,22 +180,33 @@ public class StorageService {
     }
 
     public List<ResourceDto> search(String query, Long userId) {
-        if (query == null || query.isBlank()) throw new MyBadRequestException("Empty query");
-        String root = getUserRootPath(userId);
-        List<ResourceDto> found = new ArrayList<>();
-        var items = minioRepository.list(root, true);
-        for (Result<Item> result : items) {
-            try {
-                Item item = result.get();
-                if (getFileNameFromPath(item.objectName()).toLowerCase().contains(query.toLowerCase())) {
-                    found.add(mapToResourceDto(item, userId));
-                }
-            } catch (Exception e) {
-                log.error("Error while getting object from minio for user {}", userId, e);
-                throw new RuntimeException("Search errorig");
-            }
+        if (query == null || query.isBlank()) {
+            throw new MyBadRequestException("Empty query");
         }
-        return found;
+
+        String root = getUserRootPath(userId);
+        String lowerQuery = query.toLowerCase();
+
+        Iterable<Result<Item>> results = minioRepository.list(root, true);
+
+        return StreamSupport.stream(results.spliterator(), true)
+                .map(result -> {
+                    try {
+                        return result.get();
+                    } catch (Exception e) {
+                        log.error("Error getting item during search for user {}", userId, e);
+                        return null;
+                    }
+                })
+                .filter(item -> item != null)
+                .filter(item -> {
+                    String fileName = getFileNameFromPath(item.objectName());
+                    return fileName.toLowerCase().contains(lowerQuery);
+                })
+
+                .map(item -> mapToResourceDto(item, userId))
+
+                .collect(Collectors.toList());
     }
 
     public void downloadResource(String path, Long userId, OutputStream outputStream) {
