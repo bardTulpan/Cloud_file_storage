@@ -253,6 +253,15 @@ class SecurityPracticaApplicationTests {
         assertThat(results.get(0).name()).isEqualTo("filename.txt");
     }
 
+    @Test
+    void testSearchCanFindTheDirectory() {
+        Long userId = 999L;
 
+        storageService.createDirectory("test/",  userId);
 
+        var results = storageService.search("test", userId);
+
+        assertThat(results.get(0).name()).isEqualTo("test");
+
+    }
 }
