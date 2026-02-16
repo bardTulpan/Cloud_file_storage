@@ -7,7 +7,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.example.securitypractica.dto.ResourceDto;
 import org.example.securitypractica.dto.ResourceType;
 import org.example.securitypractica.exception.FileAlreadyExistsException;
-import org.example.securitypractica.exception.InvalidPathException;
 import org.example.securitypractica.exception.MyBadRequestException;
 import org.example.securitypractica.exception.NotFoundException;
 import org.example.securitypractica.repository.MinioRepository;
@@ -32,19 +31,20 @@ public class StorageService {
 
     private final MinioRepository minioRepository;
     private final ZipService zipService;
+    private final PathService pathService;
 
     @Value("${minio.bucket-name}")
     private String bucketName;
 
-    private final Executor storageExecutor = Executors.newFixedThreadPool(10); // Ограничим 10 потоками
+    @Value("${app.storage.threads:10}")
+    private int countOfThreads;
 
-    private String getUserRootPath(Long userId) {
-        return "user-" + userId + "-files/";
-    }
+    private final Executor storageExecutor = Executors.newFixedThreadPool(countOfThreads);
+
 
     public ResourceDto getResource(String path, Long userId) {
-        String normalized = normalizePath(path);
-        String root = getUserRootPath(userId);
+        String normalized = pathService.normalizePath(path);
+        String root = pathService.getUserRootPath(userId);
         String fullPath = root + normalized;
 
         if (normalized.isEmpty()) {
@@ -53,16 +53,16 @@ public class StorageService {
 
         if (fullPath.endsWith("/")) {
             if (minioRepository.exists(fullPath)) {
-                return mapToDto(normalized, null, ResourceType.DIRECTORY);
+                return pathService.mapToDto(normalized, null, ResourceType.DIRECTORY);
             }
         } else {
             var metadata = minioRepository.getMetadata(fullPath);
             if (metadata != null) {
-                return mapToDto(normalized, metadata.size(), ResourceType.FILE);
+                return pathService.mapToDto(normalized, metadata.size(), ResourceType.FILE);
             }
 
             if (minioRepository.exists(fullPath + "/")) {
-                return mapToDto(normalized + "/", null, ResourceType.DIRECTORY);
+                return pathService.mapToDto(normalized + "/", null, ResourceType.DIRECTORY);
             }
         }
 
@@ -70,8 +70,8 @@ public class StorageService {
     }
 
     public ResourceDto createDirectory(String path, Long userId) {
-        String normalized = normalizeDirectoryPath(path);
-        String fullPath = getUserRootPath(userId) + normalized;
+        String normalized = pathService.normalizeDirectoryPath(path);
+        String fullPath = pathService.getUserRootPath(userId) + normalized;
 
         if (minioRepository.exists(fullPath)) {
             throw new FileAlreadyExistsException("Directory already exists");
@@ -79,38 +79,50 @@ public class StorageService {
         validateParentExists(normalized, userId);
         minioRepository.createFolder(fullPath);
 
-        return mapToDto(normalized, null, ResourceType.DIRECTORY);
+        return pathService.mapToDto(normalized, null, ResourceType.DIRECTORY);
     }
 
+
+
     public List<ResourceDto> uploadFiles(String path, List<MultipartFile> files, Long userId) {
-        String normalizedPath = normalizeDirectoryPath(path);
+        log.info("User {} started upload of {} files to path: {}", userId, files.size(), path);
+        String normalizedPath = pathService.normalizeDirectoryPath(path);
         validateParentExists(normalizedPath, userId);
-        String rootPath = getUserRootPath(userId);
-        List<ResourceDto> results = new ArrayList<>();
-        for (MultipartFile file : files) {
-            String originalFilename = file.getOriginalFilename();
-            if (originalFilename == null || originalFilename.isBlank()) continue;
+        String rootPath = pathService.getUserRootPath(userId);
 
-            securityCheck(originalFilename);
-            String fullPath = rootPath + normalizedPath + originalFilename;
+        List<CompletableFuture<ResourceDto>> futures = files.stream()
+                .filter(file -> file.getOriginalFilename() != null && !file.getOriginalFilename().isBlank())
+                .map(file -> CompletableFuture.supplyAsync(() -> {
+                    try {
+                        String filename = file.getOriginalFilename();
+                        pathService.securityCheck(filename);
+                        String fullPath = rootPath + normalizedPath + filename;
 
-            if (minioRepository.exists(fullPath)) {
-                throw new FileAlreadyExistsException("File already exists: " + originalFilename);
-            }
+                        if (minioRepository.exists(fullPath)) {
+                            throw new FileAlreadyExistsException("File already exists: " + filename);
+                        }
 
-            try {
-                minioRepository.putFile(fullPath, file.getInputStream(), file.getSize(), file.getContentType());
-                results.add(mapToDto(normalizedPath + originalFilename, file.getSize(), ResourceType.FILE));
-            } catch (Exception e) {
-                throw new RuntimeException("Upload failed", e);
-            }
-        }
-        return results;
+                        try (InputStream is = file.getInputStream()) {
+                            minioRepository.putFile(fullPath, is, file.getSize(), file.getContentType());
+                        }
+
+                        return pathService.mapToDto(normalizedPath + filename, file.getSize(), ResourceType.FILE);
+                    } catch (Exception e) {
+                        log.error("Upload error for file: {}", file.getOriginalFilename(), e);
+                        throw new RuntimeException(e);
+                    }
+                }, storageExecutor))
+                .toList();
+
+
+        return futures.stream()
+                .map(CompletableFuture::join)
+                .collect(Collectors.toList());
     }
 
     public List<ResourceDto> listItems(String path, Long userId) {
-        String normalized = normalizeDirectoryPath(path);
-        String fullPath = getUserRootPath(userId) + normalized;
+        String normalized = pathService.normalizeDirectoryPath(path);
+        String fullPath = pathService.getUserRootPath(userId) + normalized;
 
         if (!normalized.isEmpty() && !minioRepository.exists(fullPath)) {
             throw new NotFoundException("Directory not found");
@@ -122,7 +134,7 @@ public class StorageService {
             try {
                 Item item = result.get();
                 if (item.objectName().equals(fullPath)) continue;
-                dtos.add(mapToResourceDto(item, userId));
+                dtos.add(pathService.mapToResourceDto(item, userId));
             } catch (Exception e) {
                 log.error("Error while getting listItems for user {} ", userId, e);
                 throw new RuntimeException("ListItems error");
@@ -132,8 +144,9 @@ public class StorageService {
     }
 
     public void deleteResource(String path, Long userId) {
-        String normalized = normalizePath(path);
-        String fullPath = getUserRootPath(userId) + normalized;
+        log.warn("User {} is deleting resource: {}", userId, path);
+        String normalized = pathService.normalizePath(path);
+        String fullPath = pathService.getUserRootPath(userId) + normalized;
 
         if (!minioRepository.exists(fullPath)) throw new NotFoundException("Not found");
 
@@ -159,24 +172,29 @@ public class StorageService {
     }
 
     public void move(String from, String to, Long userId) {
-        String root = getUserRootPath(userId);
-        String fullFrom = root + normalizePath(from);
-        String fullTo = root + normalizePath(to);
+        String root = pathService.getUserRootPath(userId);
+        String fullFrom = root + pathService.normalizePath(from);
+        String fullTo = root + pathService.normalizePath(to);
 
         if (!minioRepository.exists(fullFrom)) throw new NotFoundException("Source not found");
         if (minioRepository.exists(fullTo)) throw new FileAlreadyExistsException("Target exists");
 
         var items = minioRepository.list(fullFrom, true);
+        List<CompletableFuture<Void>> futures = new ArrayList<>();
+
         for (Result<Item> result : items) {
-            try {
-                String oldKey = result.get().objectName();
-                String newKey = fullTo + oldKey.substring(fullFrom.length());
-                minioRepository.copy(oldKey, newKey);
-                minioRepository.delete(oldKey);
-            } catch (Exception e) {
-                throw new RuntimeException("Move error", e);
-            }
+            futures.add(CompletableFuture.runAsync(() -> {
+                try {
+                    String oldKey = result.get().objectName();
+                    String newKey = fullTo + oldKey.substring(fullFrom.length());
+                    minioRepository.copy(oldKey, newKey);
+                    minioRepository.delete(oldKey);
+                } catch (Exception e) {
+                    log.error("Failed to move object in {} to {}", from, to, e.getMessage());
+                }
+            }, storageExecutor));
         }
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
     }
 
     public List<ResourceDto> search(String query, Long userId) {
@@ -184,7 +202,7 @@ public class StorageService {
             throw new MyBadRequestException("Empty query");
         }
 
-        String root = getUserRootPath(userId);
+        String root = pathService.getUserRootPath(userId);
         String lowerQuery = query.toLowerCase();
 
         Iterable<Result<Item>> results = minioRepository.list(root, true);
@@ -200,17 +218,17 @@ public class StorageService {
                 })
                 .filter(item -> item != null)
                 .filter(item -> {
-                    String fileName = getFileNameFromPath(item.objectName());
+                    String fileName = pathService.getFileNameFromPath(item.objectName());
                     return fileName.toLowerCase().contains(lowerQuery);
                 })
 
-                .map(item -> mapToResourceDto(item, userId))
+                .map(item -> pathService.mapToResourceDto(item, userId))
 
                 .collect(Collectors.toList());
     }
 
     public void downloadResource(String path, Long userId, OutputStream outputStream) {
-        String fullPath = getUserRootPath(userId) + normalizePath(path);
+        String fullPath = pathService.getUserRootPath(userId) + pathService.normalizePath(path);
         if (fullPath.endsWith("/")) {
             zipService.archiveFolder(bucketName, fullPath, outputStream);
         } else {
@@ -223,55 +241,16 @@ public class StorageService {
     }
 
     public void checkResourceExists(String path, Long userId) {
-        if (!minioRepository.exists(getUserRootPath(userId) + normalizePath(path))) {
+        if (!minioRepository.exists(pathService.getUserRootPath(userId) + pathService.normalizePath(path))) {
             throw new NotFoundException("Resource not found");
         }
     }
 
-    private String normalizePath(String path) {
-        if (path == null || path.isBlank()) return "";
-        securityCheck(path);
-        String res = path.startsWith("/") ? path.substring(1) : path;
-        return res.replaceAll("/{2,}", "/");
-    }
-
-    private String normalizeDirectoryPath(String path) {
-        String n = normalizePath(path);
-        return (n.isEmpty() || n.endsWith("/")) ? n : n + "/";
-    }
-
-    private void securityCheck(String path) {
-        if (path.contains("..")) throw new InvalidPathException("Security violation");
-    }
 
     private void validateParentExists(String path, Long userId) {
-        String parent = getParentPath(path);
-        if (!parent.isEmpty() && !minioRepository.exists(getUserRootPath(userId) + parent)) {
+        String parent = pathService.getParentPath(path);
+        if (!parent.isEmpty() && !minioRepository.exists(pathService.getUserRootPath(userId) + parent)) {
             throw new NotFoundException("Parent not found");
         }
-    }
-
-    private String getParentPath(String path) {
-        String t = path.endsWith("/") ? path.substring(0, path.length() - 1) : path;
-        int last = t.lastIndexOf("/");
-        return (last == -1) ? "" : path.substring(0, last + 1);
-    }
-
-    private String getFileNameFromPath(String path) {
-        String c = path.endsWith("/") ? path.substring(0, path.length() - 1) : path;
-        return c.substring(c.lastIndexOf("/") + 1);
-    }
-
-    private ResourceDto mapToResourceDto(Item item, Long userId) {
-        String full = item.objectName();
-        String rel = full.substring(getUserRootPath(userId).length());
-        boolean isDir = full.endsWith("/");
-        String name = getFileNameFromPath(full);
-        String parent = rel.substring(0, rel.length() - (isDir ? name.length() + 1 : name.length()));
-        return new ResourceDto(parent, name, isDir ? null : item.size(), isDir ? ResourceType.DIRECTORY : ResourceType.FILE);
-    }
-
-    private ResourceDto mapToDto(String relPath, Long size, ResourceType type) {
-        return new ResourceDto(getParentPath(relPath), getFileNameFromPath(relPath), size, type);
     }
 }
