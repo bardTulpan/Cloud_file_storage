@@ -26,21 +26,28 @@ import java.util.stream.StreamSupport;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class StorageService {
 
     private final MinioRepository minioRepository;
     private final ZipService zipService;
     private final PathService pathService;
+    private final String bucketName;
+    private final Executor storageExecutor;
 
-    @Value("${minio.bucket-name}")
-    private String bucketName;
-
-    @Value("${app.storage.threads:10}")
-    private int countOfThreads;
-
-    private final Executor storageExecutor = Executors.newFixedThreadPool(countOfThreads);
-
+    public StorageService(
+            MinioRepository minioRepository,
+            ZipService zipService,
+            PathService pathService,
+            @Value("${minio.bucket-name}") String bucketName,
+            @Value("${app.storage.threads:10}") int countOfThreads
+    ) {
+        this.minioRepository = minioRepository;
+        this.zipService = zipService;
+        this.pathService = pathService;
+        this.bucketName = bucketName;
+        this.storageExecutor = Executors.newFixedThreadPool(countOfThreads);
+        log.info("StorageService initialized with {} threads", countOfThreads);
+    }
 
     public ResourceDto getResource(String path, Long userId) {
         String normalized = pathService.normalizePath(path);
@@ -85,7 +92,7 @@ public class StorageService {
 
 
     public List<ResourceDto> uploadFiles(String path, List<MultipartFile> files, Long userId) {
-        log.info("User {} started upload of {} files to path: {}", userId, files.size(), path);
+
         String normalizedPath = pathService.normalizeDirectoryPath(path);
         validateParentExists(normalizedPath, userId);
         String rootPath = pathService.getUserRootPath(userId);
