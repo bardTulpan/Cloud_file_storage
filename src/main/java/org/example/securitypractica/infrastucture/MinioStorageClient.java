@@ -1,4 +1,4 @@
-package org.example.securitypractica.repository;
+package org.example.securitypractica.infrastucture;
 
 import io.minio.*;
 import io.minio.errors.ErrorResponseException;
@@ -12,11 +12,11 @@ import java.io.InputStream;
 
 @Repository
 @RequiredArgsConstructor
-public class MinioRepository {
+public class MinioStorageClient {
 
     private final MinioClient minioClient;
 
-    @Value("${minio.bucket-name:test-backet}")
+    @Value("${minio.bucket-name:test-bucket}")
     private String bucketName;
 
     public boolean exists(String path) {
