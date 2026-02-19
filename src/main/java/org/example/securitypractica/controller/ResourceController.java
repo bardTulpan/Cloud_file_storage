@@ -7,7 +7,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.example.securitypractica.dto.ResourceDto;
-import org.example.securitypractica.exception.MyBadRequestException;
+import org.example.securitypractica.exception.BadRequestException;
 import org.example.securitypractica.service.StorageService;
 import org.example.securitypractica.service.UserService;
 import org.springframework.http.HttpHeaders;
@@ -76,7 +76,7 @@ public class ResourceController {
             Principal principal) {
 
         if (files == null || files.isEmpty()) {
-            throw new MyBadRequestException("No files selected for upload");
+            throw new BadRequestException("No files selected for upload");
         }
         return storageService.uploadFiles(path, files, getUserId(principal));
     }

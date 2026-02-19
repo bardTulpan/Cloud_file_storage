@@ -2,12 +2,11 @@ package org.example.securitypractica.service;
 
 import io.minio.Result;
 import io.minio.messages.Item;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.securitypractica.dto.ResourceDto;
 import org.example.securitypractica.dto.ResourceType;
 import org.example.securitypractica.exception.FileAlreadyExistsException;
-import org.example.securitypractica.exception.MyBadRequestException;
+import org.example.securitypractica.exception.BadRequestException;
 import org.example.securitypractica.exception.NotFoundException;
 import org.example.securitypractica.repository.MinioRepository;
 import org.springframework.beans.factory.annotation.Value;
@@ -206,7 +205,7 @@ public class StorageService {
 
     public List<ResourceDto> search(String query, Long userId) {
         if (query == null || query.isBlank()) {
-            throw new MyBadRequestException("Empty query");
+            throw new BadRequestException("Empty query");
         }
 
         String root = pathService.getUserRootPath(userId);

@@ -19,7 +19,7 @@ public class GlobalExceptionHandler {
         return new ErrorResponse(ex.getMessage(), LocalDateTime.now());
     }
 
-    @ExceptionHandler({InvalidPathException.class, MethodArgumentNotValidException.class, MyBadRequestException.class})
+    @ExceptionHandler({InvalidPathException.class, MethodArgumentNotValidException.class, BadRequestException.class})
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ErrorResponse handleBadRequest(Exception ex) {
         String message = ex instanceof MethodArgumentNotValidException ? "Validation failed" : ex.getMessage();
