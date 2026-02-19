@@ -4,6 +4,7 @@ import io.minio.*;
 import io.minio.errors.ErrorResponseException;
 import io.minio.messages.Item;
 import org.example.securitypractica.config.MinioProperties;
+import org.example.securitypractica.exception.StorageException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
 
@@ -31,10 +32,12 @@ public class MinioStorageClient {
                             .build());
             return true;
         } catch (ErrorResponseException e) {
-            if ("NoSuchKey".equals(e.errorResponse().code())) return false;
-            throw new RuntimeException("MinIO stat error", e);
+            if ("NoSuchKey".equals(e.errorResponse().code())) {
+                return false;
+            }
+            throw new StorageException("MinIO stat error for path: " + path, e);
         } catch (Exception e) {
-            return false;
+            throw new StorageException("Unexpected error checking existence: " + path, e);
         }
     }
 
