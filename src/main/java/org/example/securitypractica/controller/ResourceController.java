@@ -52,11 +52,13 @@ public class ResourceController {
 
     @Operation(summary = "Перемещение или переименование", description = "Переносит ресурс (файл или папку) по новому пути.")
     @PutMapping("/move")
-    public void move(
+    public ResourceDto move(
             @RequestParam String from,
             @RequestParam String to,
             Principal principal) {
         storageService.move(from, to, getUserId(principal));
+        return storageService.getResource(to, getUserId(principal));
+
     }
 
     @Operation(summary = "Поиск", description = "Глобальный поиск файлов и папок по части имени.")
