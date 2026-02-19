@@ -3,6 +3,7 @@ package org.example.securitypractica.service;
 import io.minio.Result;
 import io.minio.messages.Item;
 import lombok.extern.slf4j.Slf4j;
+import org.example.securitypractica.config.MinioProperties;
 import org.example.securitypractica.dto.ResourceDto;
 import org.example.securitypractica.dto.ResourceType;
 import org.example.securitypractica.exception.FileAlreadyExistsException;
@@ -30,21 +31,21 @@ public class StorageService {
     private final MinioStorageClient minioStorageClient;
     private final ZipService zipService;
     private final PathService pathService;
-    private final String bucketName;
     private final Executor storageExecutor;
+    private final MinioProperties minioProperties;
 
     public StorageService(
             MinioStorageClient minioStorageClient,
             ZipService zipService,
             PathService pathService,
-            @Value("${minio.bucket-name}") String bucketName,
+            MinioProperties minioProperties,
             @Value("${app.storage.threads:10}") int countOfThreads
     ) {
         this.minioStorageClient = minioStorageClient;
         this.zipService = zipService;
         this.pathService = pathService;
-        this.bucketName = bucketName;
         this.storageExecutor = Executors.newFixedThreadPool(countOfThreads);
+        this.minioProperties = minioProperties;
         log.info("StorageService initialized with {} threads", countOfThreads);
     }
 
@@ -236,7 +237,7 @@ public class StorageService {
     public void downloadResource(String path, Long userId, OutputStream outputStream) {
         String fullPath = pathService.getUserRootPath(userId) + pathService.normalizePath(path);
         if (fullPath.endsWith("/")) {
-            zipService.archiveFolder(bucketName, fullPath, outputStream);
+            zipService.archiveFolder(minioProperties.getBucketName(), fullPath, outputStream);
         } else {
             try (InputStream is = minioStorageClient.getObject(fullPath)) {
                 is.transferTo(outputStream);

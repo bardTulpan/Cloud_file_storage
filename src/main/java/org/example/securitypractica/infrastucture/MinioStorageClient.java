@@ -3,7 +3,7 @@ package org.example.securitypractica.infrastucture;
 import io.minio.*;
 import io.minio.errors.ErrorResponseException;
 import io.minio.messages.Item;
-import lombok.RequiredArgsConstructor;
+import org.example.securitypractica.config.MinioProperties;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
 
@@ -11,20 +11,22 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 
 @Repository
-@RequiredArgsConstructor
 public class MinioStorageClient {
 
     private final MinioClient minioClient;
+    private final MinioProperties minioProperties;
 
-    @Value("${minio.bucket-name:test-bucket}")
-    private String bucketName;
+    public MinioStorageClient(MinioClient minioClient,  MinioProperties minioProperties) {
+        this.minioClient = minioClient;
+        this.minioProperties = minioProperties;
+    }
 
     public boolean exists(String path) {
         try {
             minioClient.statObject(
                     StatObjectArgs
                             .builder()
-                            .bucket(bucketName)
+                            .bucket(minioProperties.getBucketName())
                             .object(path)
                             .build());
             return true;
@@ -39,7 +41,7 @@ public class MinioStorageClient {
     public Iterable<Result<Item>> list(String prefix, boolean recursive) {
         return minioClient.listObjects(
                 ListObjectsArgs.builder()
-                        .bucket(bucketName)
+                        .bucket(minioProperties.getBucketName())
                         .prefix(prefix)
                         .recursive(recursive)
                         .build()
@@ -50,7 +52,7 @@ public class MinioStorageClient {
         try {
             minioClient.putObject(
                     PutObjectArgs.builder()
-                            .bucket(bucketName)
+                            .bucket(minioProperties.getBucketName())
                             .object(path)
                             .stream(new ByteArrayInputStream(new byte[0]), 0, -1)
                             .build()
@@ -64,7 +66,7 @@ public class MinioStorageClient {
         try {
             minioClient.putObject(
                     PutObjectArgs.builder()
-                            .bucket(bucketName)
+                            .bucket(minioProperties.getBucketName())
                             .object(objectName)
                             .stream(inputStream, size, -1)
                             .contentType(contentType)
@@ -80,7 +82,7 @@ public class MinioStorageClient {
             return minioClient.getObject(
                     GetObjectArgs
                             .builder()
-                            .bucket(bucketName)
+                            .bucket(minioProperties.getBucketName())
                             .object(path)
                             .build()
             );
@@ -93,10 +95,10 @@ public class MinioStorageClient {
         try {
             minioClient.copyObject(
                     CopyObjectArgs.builder()
-                            .bucket(bucketName)
+                            .bucket(minioProperties.getBucketName())
                             .object(destinationPath)
                             .source(CopySource.builder()
-                                    .bucket(bucketName)
+                                    .bucket(minioProperties.getBucketName())
                                     .object(sourcePath)
                                     .build())
                             .build()
@@ -111,7 +113,7 @@ public class MinioStorageClient {
             minioClient.removeObject(
                     RemoveObjectArgs
                             .builder()
-                            .bucket(bucketName)
+                            .bucket(minioProperties.getBucketName())
                             .object(path)
                             .build());
         } catch (Exception e) {
@@ -123,7 +125,7 @@ public class MinioStorageClient {
         try {
             return minioClient.statObject(
                     StatObjectArgs.builder()
-                            .bucket(bucketName)
+                            .bucket(minioProperties.getBucketName())
                             .object(path)
                             .build()
             );
