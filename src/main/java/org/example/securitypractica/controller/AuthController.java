@@ -77,11 +77,5 @@ public class AuthController {
 
         return new RegistrationResponseDto(registrationDto.getUsername());
     }
-
-    @Operation(summary = "Получение информации о текущем пользователе")
-    @GetMapping("/me")
-    public UserMeResponseDto getCurrentUser(Principal principal) {
-        return new UserMeResponseDto(principal.getName());
-    }
 }
 
