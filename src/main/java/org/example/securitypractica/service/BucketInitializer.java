@@ -5,7 +5,9 @@ import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
+import org.example.securitypractica.config.MinioProperties;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -14,27 +16,26 @@ import org.springframework.stereotype.Component;
 public class BucketInitializer {
 
     private final MinioClient minioClient;
+    private final MinioProperties minioProperties;
 
-    @Value("${minio.bucket-name}")
-    private String bucketName;
-
+    @EventListener(ApplicationReadyEvent.class)
     public void initBucket() {
         try {
             boolean exists = minioClient.bucketExists(
                     BucketExistsArgs
                             .builder()
-                            .bucket(bucketName)
+                            .bucket(minioProperties.getBucketName())
                             .build()
             );
             if (!exists) {
                 minioClient.makeBucket(MakeBucketArgs
                         .builder()
-                        .bucket(bucketName)
+                        .bucket(minioProperties.getBucketName())
                         .build());
-                log.info("Bucket '{}' created.", bucketName);
+                log.info("Bucket '{}' created.", minioProperties.getBucketName());
             }
         } catch (Exception e) {
-            throw new IllegalStateException("Failed to initialize MinIO bucket: " + bucketName, e);
+            throw new IllegalStateException("Failed to initialize MinIO bucket: " + minioProperties.getBucketName(), e);
         }
     }
 }
