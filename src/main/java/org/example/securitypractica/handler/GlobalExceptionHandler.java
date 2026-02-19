@@ -1,4 +1,4 @@
-package org.example.securitypractica.controller;
+package org.example.securitypractica.handler;
 
 import org.example.securitypractica.dto.ErrorResponse;
 import org.example.securitypractica.exception.*;
