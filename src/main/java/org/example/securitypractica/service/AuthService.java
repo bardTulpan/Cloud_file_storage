@@ -29,8 +29,9 @@ public class AuthService {
     @Transactional
     public RegistrationResponseDto register(RegistrationDto registrationDto) {
         User user = new User(registrationDto.getUsername(), registrationDto.getPassword());
+        boolean usernameAlreadyTaken = userRepository.findByUsername(registrationDto.getUsername()).isPresent();
 
-        if (userRepository.findByUsername(user.getUsername()).isPresent()) {
+        if (usernameAlreadyTaken) {
             throw new UsernameExistsException("User with username: " + user.getUsername() + " is already exists");
         }
         user.setPassword(passwordEncoder.encode(user.getPassword()));
