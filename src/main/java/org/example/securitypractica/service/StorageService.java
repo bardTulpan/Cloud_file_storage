@@ -196,8 +196,20 @@ public class StorageService {
         String fullTo = root + PathUtils.normalizePath(to);
 
         if (!minioStorageClient.exists(fullFrom)) throw new NotFoundException("Source not found");
-        if (minioStorageClient.exists(fullTo)) throw new FileAlreadyExistsException("Target exists");
+        if (minioStorageClient.exists(fullTo)) throw new FileAlreadyExistsException("Target already exists");
 
+        boolean isDirectory = fullFrom.endsWith("/");
+
+        if (isDirectory) {
+            moveDirectory(fullFrom, fullTo);
+        } else {
+            minioStorageClient.copy(fullFrom, fullTo);
+            minioStorageClient.delete(fullFrom);
+        }
+
+    }
+
+    public void moveDirectory(String fullFrom, String fullTo) {
         var items = minioStorageClient.list(fullFrom, true);
         List<CompletableFuture<Void>> futures = new ArrayList<>();
 
@@ -214,10 +226,11 @@ public class StorageService {
             }, storageExecutor));
         }
         try {
-        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
         } catch (CompletionException e) {
             throw new StorageException("Partial copy failure", (Exception) e.getCause());
         }
+
     }
 
     public List<ResourceDto> search(String query, Long userId) {
