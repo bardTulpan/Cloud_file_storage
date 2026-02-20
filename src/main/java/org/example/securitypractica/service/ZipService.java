@@ -1,12 +1,8 @@
 package org.example.securitypractica.service;
 
-import io.minio.GetObjectArgs;
-import io.minio.ListObjectsArgs;
-import io.minio.MinioClient;
 import io.minio.Result;
 import io.minio.messages.Item;
 import lombok.RequiredArgsConstructor;
-import org.example.securitypractica.config.MinioProperties;
 import org.example.securitypractica.infrastucture.MinioStorageClient;
 import org.springframework.stereotype.Service;
 

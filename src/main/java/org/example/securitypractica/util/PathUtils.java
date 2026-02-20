@@ -1,10 +1,6 @@
 package org.example.securitypractica.util;
 
-import io.minio.messages.Item;
-import org.example.securitypractica.dto.ResourceDto;
-import org.example.securitypractica.dto.ResourceType;
 import org.example.securitypractica.exception.InvalidPathException;
-import org.springframework.stereotype.Service;
 
 public class PathUtils {
 

@@ -5,7 +5,6 @@ import lombok.RequiredArgsConstructor;
 import org.example.securitypractica.dto.RegistrationDto;
 import org.example.securitypractica.dto.RegistrationResponseDto;
 import org.example.securitypractica.entity.User;
-import org.example.securitypractica.exception.InvalidCredentialsException;
 import org.example.securitypractica.exception.UsernameExistsException;
 import org.example.securitypractica.mapper.UserMapper;
 import org.example.securitypractica.repository.UserRepository;

@@ -5,7 +5,6 @@ import io.minio.errors.ErrorResponseException;
 import io.minio.messages.Item;
 import org.example.securitypractica.config.MinioProperties;
 import org.example.securitypractica.exception.StorageException;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
 
 import java.io.ByteArrayInputStream;

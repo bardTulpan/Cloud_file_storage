@@ -1,7 +1,6 @@
 package org.example.securitypractica.mapper;
 
 import io.minio.messages.Item;
-import lombok.RequiredArgsConstructor;
 import org.example.securitypractica.dto.ResourceDto;
 import org.example.securitypractica.dto.ResourceType;
 import org.example.securitypractica.util.PathUtils;
