@@ -38,18 +38,4 @@ public class PathUtils {
     public static String getUserRootPath(Long userId) {
         return "user-" + userId + "-files/";
     }
-
-    public static ResourceDto mapToDto(String relPath, Long size, ResourceType type) {
-        return new ResourceDto(getParentPath(relPath), getFileNameFromPath(relPath), size, type);
-    }
-
-    public static ResourceDto mapToResourceDto(Item item, Long userId) {
-        String full = item.objectName();
-        String rel = full.substring(getUserRootPath(userId).length());
-        boolean isDir = full.endsWith("/");
-        String name = getFileNameFromPath(full);
-        String parent = rel.substring(0, rel.length() - (isDir ? name.length() + 1 : name.length()));
-        return new ResourceDto(parent, name, isDir ? null : item.size(), isDir ? ResourceType.DIRECTORY : ResourceType.FILE);
-    }
-
 }

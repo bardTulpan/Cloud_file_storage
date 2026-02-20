@@ -11,6 +11,7 @@ import org.example.securitypractica.exception.BadRequestException;
 import org.example.securitypractica.exception.NotFoundException;
 import org.example.securitypractica.exception.StorageException;
 import org.example.securitypractica.infrastucture.MinioStorageClient;
+import org.example.securitypractica.mapper.ResourceMapper;
 import org.example.securitypractica.util.PathUtils;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -34,6 +35,7 @@ public class StorageService {
     private final MinioStorageClient minioStorageClient;
     private final ZipService zipService;
     private final MinioProperties minioProperties;
+    private final ResourceMapper resourceMapper;
     @Qualifier("storageExecutor")
     private final Executor storageExecutor;
 
@@ -42,12 +44,14 @@ public class StorageService {
             ZipService zipService,
             MinioProperties minioProperties,
             Executor storageExecutor,
+            ResourceMapper resourceMapper,
             @Value("${app.storage.threads:10}") int countOfThreads
     ) {
         this.minioStorageClient = minioStorageClient;
         this.zipService = zipService;
         this.minioProperties = minioProperties;
         this.storageExecutor = storageExecutor;
+        this.resourceMapper = resourceMapper;
         log.info("StorageService initialized with {} threads", countOfThreads);
     }
 
@@ -62,16 +66,16 @@ public class StorageService {
 
         if (fullPath.endsWith("/")) {
             if (minioStorageClient.exists(fullPath)) {
-                return PathUtils.mapToDto(normalized, null, ResourceType.DIRECTORY);
+                return resourceMapper.mapToDto(normalized, null, ResourceType.DIRECTORY);
             }
         } else {
             var metadata = minioStorageClient.getMetadata(fullPath);
             if (metadata != null) {
-                return PathUtils.mapToDto(normalized, metadata.size(), ResourceType.FILE);
+                return resourceMapper.mapToDto(normalized, metadata.size(), ResourceType.FILE);
             }
 
             if (minioStorageClient.exists(fullPath + "/")) {
-                return PathUtils.mapToDto(normalized + "/", null, ResourceType.DIRECTORY);
+                return resourceMapper.mapToDto(normalized + "/", null, ResourceType.DIRECTORY);
             }
         }
 
@@ -88,7 +92,7 @@ public class StorageService {
         validateParentExists(normalized, userId);
         minioStorageClient.createFolder(fullPath);
 
-        return PathUtils.mapToDto(normalized, null, ResourceType.DIRECTORY);
+        return resourceMapper.mapToDto(normalized, null, ResourceType.DIRECTORY);
     }
 
 
@@ -115,7 +119,7 @@ public class StorageService {
                             minioStorageClient.putFile(fullPath, is, file.getSize(), file.getContentType());
                         }
 
-                        return PathUtils.mapToDto(normalizedPath + filename, file.getSize(), ResourceType.FILE);
+                        return resourceMapper.mapToDto(normalizedPath + filename, file.getSize(), ResourceType.FILE);
                     } catch (FileAlreadyExistsException e) {
                         throw e;
                     } catch (Exception e) {
@@ -145,7 +149,7 @@ public class StorageService {
             try {
                 Item item = result.get();
                 if (item.objectName().equals(fullPath)) continue;
-                dtos.add(PathUtils.mapToResourceDto(item, userId));
+                dtos.add(resourceMapper.mapToResourceDto(item, userId));
             } catch (Exception e) {
                 log.error("Error while getting listItems for user {} ", userId, e);
                 throw new RuntimeException("ListItems error");
@@ -241,7 +245,7 @@ public class StorageService {
                     return fileName.toLowerCase().contains(lowerQuery);
                 })
 
-                .map(item -> PathUtils.mapToResourceDto(item, userId))
+                .map(item -> resourceMapper.mapToResourceDto(item, userId))
 
                 .collect(Collectors.toList());
     }
