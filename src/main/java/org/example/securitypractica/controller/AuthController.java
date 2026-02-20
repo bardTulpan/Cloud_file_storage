@@ -42,8 +42,11 @@ public class AuthController {
     })
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("/sign-up")
-    public RegistrationResponseDto registration(@RequestBody @Valid RegistrationDto registrationDto) {
-        return authService.register(registrationDto);
+    public RegistrationResponseDto registration(@RequestBody @Valid RegistrationDto registrationDto, HttpServletRequest request, HttpServletResponse response) {
+        RegistrationResponseDto registrationResponseDto =  authService.register(registrationDto);
+        authenticateAndSaveContext(registrationDto, request, response);
+
+        return registrationResponseDto;
     }
 
     @Operation(summary = "Вход в систему (получение сессии)")
@@ -53,8 +56,14 @@ public class AuthController {
     })
     @PostMapping("/sign-in")
     public RegistrationResponseDto signIn(@RequestBody @Valid RegistrationDto registrationDto, HttpServletRequest request, HttpServletResponse response) {
+        authenticateAndSaveContext(registrationDto, request, response);
+
+        return new RegistrationResponseDto(registrationDto.getUsername());
+    }
+
+    private void authenticateAndSaveContext(RegistrationDto registrationDto, HttpServletRequest request, HttpServletResponse response) {
         UsernamePasswordAuthenticationToken authenticationToken =
-                new UsernamePasswordAuthenticationToken(registrationDto.getUsername(), registrationDto.getPassword());
+                new UsernamePasswordAuthenticationToken(registrationDto.getUsername(), registrationDto.getUsername());
 
         Authentication authentication = authenticationManager.authenticate(authenticationToken);
 
@@ -63,8 +72,6 @@ public class AuthController {
         SecurityContextHolder.setContext(context);
 
         securityContextRepository.saveContext(context, request, response);
-
-        return new RegistrationResponseDto(registrationDto.getUsername());
     }
 }
 
