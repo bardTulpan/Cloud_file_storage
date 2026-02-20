@@ -5,6 +5,7 @@ import org.example.securitypractica.dto.RegistrationDto;
 import org.example.securitypractica.dto.RegistrationResponseDto;
 import org.example.securitypractica.entity.User;
 import org.example.securitypractica.exception.InvalidCredentialsException;
+import org.example.securitypractica.exception.UsernameExistsException;
 import org.example.securitypractica.mapper.UserMapper;
 import org.example.securitypractica.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,7 +31,7 @@ public class AuthService {
         User user = new User(registrationDto.getUsername(), registrationDto.getPassword());
 
         if (userRepository.findByUsername(user.getUsername()).isPresent()) {
-            throw new InvalidCredentialsException("User with username: " + user.getUsername() + " is already exists");
+            throw new UsernameExistsException("User with username: " + user.getUsername() + " is already exists");
         }
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         user.setRole("ROLE_USER");

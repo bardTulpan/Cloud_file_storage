@@ -43,4 +43,10 @@ public class GlobalExceptionHandler {
     public ErrorResponse handleGlobal(Exception ex) {
         return new ErrorResponse("Internal server error: " + ex.getMessage(), LocalDateTime.now());
     }
+
+    @ExceptionHandler(UsernameExistsException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleUsernameExistsException(UsernameExistsException ex) {
+        return new ErrorResponse(ex.getMessage(), LocalDateTime.now());
+    }
 }
