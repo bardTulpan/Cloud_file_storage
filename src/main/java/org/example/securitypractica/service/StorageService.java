@@ -11,12 +11,12 @@ import org.example.securitypractica.exception.BadRequestException;
 import org.example.securitypractica.exception.NotFoundException;
 import org.example.securitypractica.exception.StorageException;
 import org.example.securitypractica.infrastucture.MinioStorageClient;
+import org.example.securitypractica.util.PathUtils;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -34,7 +33,6 @@ public class StorageService {
 
     private final MinioStorageClient minioStorageClient;
     private final ZipService zipService;
-    private final PathService pathService;
     private final MinioProperties minioProperties;
     @Qualifier("storageExecutor")
     private final Executor storageExecutor;
@@ -42,22 +40,20 @@ public class StorageService {
     public StorageService(
             MinioStorageClient minioStorageClient,
             ZipService zipService,
-            PathService pathService,
             MinioProperties minioProperties,
             Executor storageExecutor,
             @Value("${app.storage.threads:10}") int countOfThreads
     ) {
         this.minioStorageClient = minioStorageClient;
         this.zipService = zipService;
-        this.pathService = pathService;
         this.minioProperties = minioProperties;
         this.storageExecutor = storageExecutor;
         log.info("StorageService initialized with {} threads", countOfThreads);
     }
 
     public ResourceDto getResource(String path, Long userId) {
-        String normalized = pathService.normalizePath(path);
-        String root = pathService.getUserRootPath(userId);
+        String normalized = PathUtils.normalizePath(path);
+        String root = PathUtils.getUserRootPath(userId);
         String fullPath = root + normalized;
 
         if (normalized.isEmpty()) {
@@ -66,16 +62,16 @@ public class StorageService {
 
         if (fullPath.endsWith("/")) {
             if (minioStorageClient.exists(fullPath)) {
-                return pathService.mapToDto(normalized, null, ResourceType.DIRECTORY);
+                return PathUtils.mapToDto(normalized, null, ResourceType.DIRECTORY);
             }
         } else {
             var metadata = minioStorageClient.getMetadata(fullPath);
             if (metadata != null) {
-                return pathService.mapToDto(normalized, metadata.size(), ResourceType.FILE);
+                return PathUtils.mapToDto(normalized, metadata.size(), ResourceType.FILE);
             }
 
             if (minioStorageClient.exists(fullPath + "/")) {
-                return pathService.mapToDto(normalized + "/", null, ResourceType.DIRECTORY);
+                return PathUtils.mapToDto(normalized + "/", null, ResourceType.DIRECTORY);
             }
         }
 
@@ -83,8 +79,8 @@ public class StorageService {
     }
 
     public ResourceDto createDirectory(String path, Long userId) {
-        String normalized = pathService.normalizeDirectoryPath(path);
-        String fullPath = pathService.getUserRootPath(userId) + normalized;
+        String normalized = PathUtils.normalizeDirectoryPath(path);
+        String fullPath = PathUtils.getUserRootPath(userId) + normalized;
 
         if (minioStorageClient.exists(fullPath)) {
             throw new FileAlreadyExistsException("Directory already exists");
@@ -92,23 +88,23 @@ public class StorageService {
         validateParentExists(normalized, userId);
         minioStorageClient.createFolder(fullPath);
 
-        return pathService.mapToDto(normalized, null, ResourceType.DIRECTORY);
+        return PathUtils.mapToDto(normalized, null, ResourceType.DIRECTORY);
     }
 
 
 
     public List<ResourceDto> uploadFiles(String path, List<MultipartFile> files, Long userId) {
 
-        String normalizedPath = pathService.normalizeDirectoryPath(path);
+        String normalizedPath = PathUtils.normalizeDirectoryPath(path);
         validateParentExists(normalizedPath, userId);
-        String rootPath = pathService.getUserRootPath(userId);
+        String rootPath = PathUtils.getUserRootPath(userId);
 
         List<CompletableFuture<ResourceDto>> futures = files.stream()
                 .filter(file -> file.getOriginalFilename() != null && !file.getOriginalFilename().isBlank())
                 .map(file -> CompletableFuture.supplyAsync(() -> {
                     try {
                         String filename = file.getOriginalFilename();
-                        pathService.securityCheck(filename);
+                        PathUtils.securityCheck(filename);
                         String fullPath = rootPath + normalizedPath + filename;
 
                         if (minioStorageClient.exists(fullPath)) {
@@ -119,7 +115,7 @@ public class StorageService {
                             minioStorageClient.putFile(fullPath, is, file.getSize(), file.getContentType());
                         }
 
-                        return pathService.mapToDto(normalizedPath + filename, file.getSize(), ResourceType.FILE);
+                        return PathUtils.mapToDto(normalizedPath + filename, file.getSize(), ResourceType.FILE);
                     } catch (FileAlreadyExistsException e) {
                         throw e;
                     } catch (Exception e) {
@@ -136,8 +132,8 @@ public class StorageService {
     }
 
     public List<ResourceDto> listItems(String path, Long userId) {
-        String normalized = pathService.normalizeDirectoryPath(path);
-        String fullPath = pathService.getUserRootPath(userId) + normalized;
+        String normalized = PathUtils.normalizeDirectoryPath(path);
+        String fullPath = PathUtils.getUserRootPath(userId) + normalized;
 
         if (!normalized.isEmpty() && !minioStorageClient.exists(fullPath)) {
             throw new NotFoundException("Directory not found");
@@ -149,7 +145,7 @@ public class StorageService {
             try {
                 Item item = result.get();
                 if (item.objectName().equals(fullPath)) continue;
-                dtos.add(pathService.mapToResourceDto(item, userId));
+                dtos.add(PathUtils.mapToResourceDto(item, userId));
             } catch (Exception e) {
                 log.error("Error while getting listItems for user {} ", userId, e);
                 throw new RuntimeException("ListItems error");
@@ -160,8 +156,8 @@ public class StorageService {
 
     public void deleteResource(String path, Long userId) {
         log.warn("User {} is deleting resource: {}", userId, path);
-        String normalized = pathService.normalizePath(path);
-        String fullPath = pathService.getUserRootPath(userId) + normalized;
+        String normalized = PathUtils.normalizePath(path);
+        String fullPath = PathUtils.getUserRootPath(userId) + normalized;
 
         if (!minioStorageClient.exists(fullPath)) throw new NotFoundException("Not found");
 
@@ -191,9 +187,9 @@ public class StorageService {
     }
 
     public void move(String from, String to, Long userId) {
-        String root = pathService.getUserRootPath(userId);
-        String fullFrom = root + pathService.normalizePath(from);
-        String fullTo = root + pathService.normalizePath(to);
+        String root = PathUtils.getUserRootPath(userId);
+        String fullFrom = root + PathUtils.normalizePath(from);
+        String fullTo = root + PathUtils.normalizePath(to);
 
         if (!minioStorageClient.exists(fullFrom)) throw new NotFoundException("Source not found");
         if (minioStorageClient.exists(fullTo)) throw new FileAlreadyExistsException("Target exists");
@@ -225,7 +221,7 @@ public class StorageService {
             throw new BadRequestException("Empty query");
         }
 
-        String root = pathService.getUserRootPath(userId);
+        String root = PathUtils.getUserRootPath(userId);
         String lowerQuery = query.toLowerCase();
 
         Iterable<Result<Item>> results = minioStorageClient.list(root, true);
@@ -241,17 +237,17 @@ public class StorageService {
                 })
                 .filter(item -> item != null)
                 .filter(item -> {
-                    String fileName = pathService.getFileNameFromPath(item.objectName());
+                    String fileName = PathUtils.getFileNameFromPath(item.objectName());
                     return fileName.toLowerCase().contains(lowerQuery);
                 })
 
-                .map(item -> pathService.mapToResourceDto(item, userId))
+                .map(item -> PathUtils.mapToResourceDto(item, userId))
 
                 .collect(Collectors.toList());
     }
 
     public void downloadResource(String path, Long userId, OutputStream outputStream) {
-        String fullPath = pathService.getUserRootPath(userId) + pathService.normalizePath(path);
+        String fullPath = PathUtils.getUserRootPath(userId) + PathUtils.normalizePath(path);
         if (fullPath.endsWith("/")) {
             zipService.archiveFolder(minioProperties.getBucketName(), fullPath, outputStream);
         } else {
@@ -264,15 +260,15 @@ public class StorageService {
     }
 
     public void checkResourceExists(String path, Long userId) {
-        if (!minioStorageClient.exists(pathService.getUserRootPath(userId) + pathService.normalizePath(path))) {
+        if (!minioStorageClient.exists(PathUtils.getUserRootPath(userId) + PathUtils.normalizePath(path))) {
             throw new NotFoundException("Resource not found");
         }
     }
 
 
     private void validateParentExists(String path, Long userId) {
-        String parent = pathService.getParentPath(path);
-        if (!parent.isEmpty() && !minioStorageClient.exists(pathService.getUserRootPath(userId) + parent)) {
+        String parent = PathUtils.getParentPath(path);
+        if (!parent.isEmpty() && !minioStorageClient.exists(PathUtils.getUserRootPath(userId) + parent)) {
             throw new NotFoundException("Parent not found");
         }
     }
