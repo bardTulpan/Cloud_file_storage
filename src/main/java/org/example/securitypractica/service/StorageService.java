@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
@@ -119,9 +120,11 @@ public class StorageService {
                         }
 
                         return pathService.mapToDto(normalizedPath + filename, file.getSize(), ResourceType.FILE);
+                    } catch (FileAlreadyExistsException e) {
+                        throw e;
                     } catch (Exception e) {
-                        log.error("Upload error for file: {}", file.getOriginalFilename(), e);
-                        throw new RuntimeException(e);
+                        log.error("Upload error", e);
+                        throw new StorageException("Failed to upload file", e);
                     }
                 }, storageExecutor))
                 .toList();
