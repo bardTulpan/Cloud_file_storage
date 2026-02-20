@@ -9,6 +9,7 @@ import org.example.securitypractica.dto.ResourceType;
 import org.example.securitypractica.exception.FileAlreadyExistsException;
 import org.example.securitypractica.exception.BadRequestException;
 import org.example.securitypractica.exception.NotFoundException;
+import org.example.securitypractica.exception.StorageException;
 import org.example.securitypractica.infrastucture.MinioStorageClient;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,6 +21,7 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
@@ -170,12 +172,16 @@ public class StorageService {
                         String objectName = result.get().objectName();
                         minioStorageClient.delete(objectName);
                     } catch (Exception e) {
-                        log.error("Failed to delete object in folder {}: {}", fullPath, e.getMessage());
+                        throw new RuntimeException("Failed to delete: " + e.getMessage(), e);
                     }
                 }, storageExecutor));
             }
 
+            try {
             CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+            } catch (CompletionException e) {
+                throw new StorageException("Partial delete failure", (Exception) e.getCause());
+            }
         }
 
         minioStorageClient.delete(fullPath);
@@ -200,11 +206,15 @@ public class StorageService {
                     minioStorageClient.copy(oldKey, newKey);
                     minioStorageClient.delete(oldKey);
                 } catch (Exception e) {
-                    log.error("Failed to move object in {} to {}", from, to, e.getMessage());
+                    throw new RuntimeException("Failed to copy: " + e.getMessage(), e);
                 }
             }, storageExecutor));
         }
+        try {
         CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+        } catch (CompletionException e) {
+            throw new StorageException("Partial copy failure", (Exception) e.getCause());
+        }
     }
 
     public List<ResourceDto> search(String query, Long userId) {
