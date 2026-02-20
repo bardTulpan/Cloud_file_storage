@@ -137,4 +137,16 @@ public class MinioStorageClient {
         }
     }
 
+    public InputStream getStream(String objectName) {
+        try {
+            return minioClient.getObject(
+                    GetObjectArgs.builder()
+                            .bucket(minioProperties.getBucketName())
+                        .object(objectName)
+                        .build());
+        } catch (Exception e) {
+            throw new StorageException("Failed to get stream from MinIO", e);
+        }
+    }
+
 }

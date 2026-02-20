@@ -266,7 +266,7 @@ public class StorageService {
     public void downloadResource(String path, Long userId, OutputStream outputStream) {
         String fullPath = PathUtils.getUserRootPath(userId) + PathUtils.normalizePath(path);
         if (fullPath.endsWith("/")) {
-            zipService.archiveFolder(minioProperties.getBucketName(), fullPath, outputStream);
+            zipService.archiveFolder(fullPath, outputStream);
         } else {
             try (InputStream is = minioStorageClient.getObject(fullPath)) {
                 is.transferTo(outputStream);

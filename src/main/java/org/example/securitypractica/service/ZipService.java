@@ -6,6 +6,8 @@ import io.minio.MinioClient;
 import io.minio.Result;
 import io.minio.messages.Item;
 import lombok.RequiredArgsConstructor;
+import org.example.securitypractica.config.MinioProperties;
+import org.example.securitypractica.infrastucture.MinioStorageClient;
 import org.springframework.stereotype.Service;
 
 import java.io.InputStream;
@@ -17,18 +19,12 @@ import java.util.zip.ZipOutputStream;
 @RequiredArgsConstructor
 public class ZipService {
 
-    private final MinioClient minioClient;
+    private final MinioStorageClient minioStorageClient;
 
-    public void archiveFolder(String bucketName, String sourcePath, OutputStream outputStream) {
+    public void archiveFolder(String sourcePath, OutputStream outputStream) {
         ZipOutputStream zos = new ZipOutputStream(outputStream);
         try {
-            Iterable<Result<Item>> results = minioClient.listObjects(
-                    ListObjectsArgs.builder()
-                            .bucket(bucketName)
-                            .prefix(sourcePath)
-                            .recursive(true)
-                            .build()
-            );
+            Iterable<Result<Item>> results = minioStorageClient.list(sourcePath, true);
 
             boolean hasEntries = false;
             for (Result<Item> result : results) {
@@ -40,12 +36,8 @@ public class ZipService {
                 ZipEntry zipEntry = new ZipEntry(entryName);
                 zos.putNextEntry(zipEntry);
 
-                try (InputStream is = minioClient.getObject(
-                        GetObjectArgs.builder()
-                                .bucket(bucketName)
-                                .object(item.objectName())
-                                .build())) {
-                    is.transferTo(zos);
+                try (InputStream inputStream = minioStorageClient.getStream(item.objectName())) {
+                    inputStream.transferTo(zos);
                 }
                 zos.closeEntry();
             }
@@ -53,10 +45,8 @@ public class ZipService {
             if (!hasEntries) {
                 throw new RuntimeException("Folder is empty, nothing to archive");
             }
-
             zos.finish();
         } catch (Exception e) {
-
             throw new RuntimeException("Error while creating zip archive: " + e.getMessage(), e);
         }
     }
