@@ -2,6 +2,7 @@ package org.example.securitypractica.service;
 
 import lombok.RequiredArgsConstructor;
 import org.example.securitypractica.entity.User;
+import org.example.securitypractica.exception.NotFoundException;
 import org.example.securitypractica.repository.UserRepository;
 import org.springframework.stereotype.Service;
 
@@ -12,7 +13,7 @@ public class UserService {
 
     public User findByUsername(String username) {
         return userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("User not found: " + username));
+                .orElseThrow(() -> new NotFoundException("User not found: " + username));
     }
 
 
