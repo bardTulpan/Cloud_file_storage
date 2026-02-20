@@ -10,6 +10,7 @@ import org.example.securitypractica.exception.FileAlreadyExistsException;
 import org.example.securitypractica.exception.BadRequestException;
 import org.example.securitypractica.exception.NotFoundException;
 import org.example.securitypractica.infrastucture.MinioStorageClient;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -31,21 +32,23 @@ public class StorageService {
     private final MinioStorageClient minioStorageClient;
     private final ZipService zipService;
     private final PathService pathService;
-    private final Executor storageExecutor;
     private final MinioProperties minioProperties;
+    @Qualifier("storageExecutor")
+    private final Executor storageExecutor;
 
     public StorageService(
             MinioStorageClient minioStorageClient,
             ZipService zipService,
             PathService pathService,
             MinioProperties minioProperties,
+            Executor storageExecutor,
             @Value("${app.storage.threads:10}") int countOfThreads
     ) {
         this.minioStorageClient = minioStorageClient;
         this.zipService = zipService;
         this.pathService = pathService;
-        this.storageExecutor = Executors.newFixedThreadPool(countOfThreads);
         this.minioProperties = minioProperties;
+        this.storageExecutor = storageExecutor;
         log.info("StorageService initialized with {} threads", countOfThreads);
     }
 
