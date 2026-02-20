@@ -2,8 +2,10 @@ package org.example.securitypractica.service;
 
 import io.minio.Result;
 import io.minio.messages.Item;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.securitypractica.config.MinioProperties;
+import org.example.securitypractica.config.ThreadProperties;
 import org.example.securitypractica.dto.ResourceDto;
 import org.example.securitypractica.dto.ResourceType;
 import org.example.securitypractica.exception.FileAlreadyExistsException;
@@ -30,30 +32,14 @@ import java.util.stream.StreamSupport;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class StorageService {
 
     private final MinioStorageClient minioStorageClient;
     private final ZipService zipService;
-    private final MinioProperties minioProperties;
     private final ResourceMapper resourceMapper;
     @Qualifier("storageExecutor")
     private final Executor storageExecutor;
-
-    public StorageService(
-            MinioStorageClient minioStorageClient,
-            ZipService zipService,
-            MinioProperties minioProperties,
-            Executor storageExecutor,
-            ResourceMapper resourceMapper,
-            @Value("${app.storage.threads:10}") int countOfThreads
-    ) {
-        this.minioStorageClient = minioStorageClient;
-        this.zipService = zipService;
-        this.minioProperties = minioProperties;
-        this.storageExecutor = storageExecutor;
-        this.resourceMapper = resourceMapper;
-        log.info("StorageService initialized with {} threads", countOfThreads);
-    }
 
     public ResourceDto getResource(String path, Long userId) {
         String normalized = PathUtils.normalizePath(path);

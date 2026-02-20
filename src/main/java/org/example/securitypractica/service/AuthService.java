@@ -1,6 +1,7 @@
 package org.example.securitypractica.service;
 
 import jakarta.transaction.Transactional;
+import lombok.RequiredArgsConstructor;
 import org.example.securitypractica.dto.RegistrationDto;
 import org.example.securitypractica.dto.RegistrationResponseDto;
 import org.example.securitypractica.entity.User;
@@ -8,23 +9,16 @@ import org.example.securitypractica.exception.InvalidCredentialsException;
 import org.example.securitypractica.exception.UsernameExistsException;
 import org.example.securitypractica.mapper.UserMapper;
 import org.example.securitypractica.repository.UserRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Service
+@RequiredArgsConstructor
 public class AuthService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final UserMapper userMapper;
-
-    @Autowired
-    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder,  UserMapper userMapper) {
-        this.userRepository = userRepository;
-        this.passwordEncoder = passwordEncoder;
-        this.userMapper = userMapper;
-    }
 
     @Transactional
     public RegistrationResponseDto register(RegistrationDto registrationDto) {
