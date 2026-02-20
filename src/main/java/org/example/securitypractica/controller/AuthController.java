@@ -28,7 +28,7 @@ public class AuthController {
     private final AuthenticationManager authenticationManager;
     private final SecurityContextRepository securityContextRepository;
 
-    public AuthController(AuthService authService, AuthenticationManager authenticationManager,  SecurityContextRepository securityContextRepository) {
+    public AuthController(AuthService authService, AuthenticationManager authenticationManager, SecurityContextRepository securityContextRepository) {
         this.authService = authService;
         this.authenticationManager = authenticationManager;
         this.securityContextRepository = securityContextRepository;
@@ -43,7 +43,7 @@ public class AuthController {
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("/sign-up")
     public RegistrationResponseDto registration(@RequestBody @Valid RegistrationDto registrationDto, HttpServletRequest request, HttpServletResponse response) {
-        RegistrationResponseDto registrationResponseDto =  authService.register(registrationDto);
+        RegistrationResponseDto registrationResponseDto = authService.register(registrationDto);
         authenticateAndSaveContext(registrationDto, request, response);
 
         return registrationResponseDto;

@@ -36,6 +36,12 @@ class SecurityPracticaApplicationTests {
 
     @Container
     static MinIOContainer minio = new MinIOContainer("minio/minio:RELEASE.2023-09-04T19-57-37Z");
+    @Autowired
+    private StorageService storageService;
+    @Autowired
+    private MinioClient minioClient;
+    @Value("${minio.bucket-name}")
+    private String bucketName;
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
@@ -48,15 +54,6 @@ class SecurityPracticaApplicationTests {
         registry.add("spring.datasource.password", postgres::getPassword);
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
     }
-
-    @Autowired
-    private StorageService storageService;
-
-    @Autowired
-    private MinioClient minioClient;
-
-    @Value("${minio.bucket-name}")
-    private String bucketName;
 
     @BeforeEach
     void clearStorage() {
@@ -86,8 +83,6 @@ class SecurityPracticaApplicationTests {
     }
 
 
-
-
     @Test
     void testUploadAndVerifyFile() {
         Long userId = 999L;
@@ -108,7 +103,7 @@ class SecurityPracticaApplicationTests {
 
         assertThat(result.name()).isEqualTo(fileName);
         assertThat(result.type()).isEqualTo(ResourceType.FILE);
-        assertThat(result.size()).isEqualTo((long) contentBytes.length);
+        assertThat(result.size()).isEqualTo(contentBytes.length);
     }
 
     @Test
@@ -257,7 +252,7 @@ class SecurityPracticaApplicationTests {
     void testSearchCanFindTheDirectory() {
         Long userId = 999L;
 
-        storageService.createDirectory("test/",  userId);
+        storageService.createDirectory("test/", userId);
 
         var results = storageService.search("test", userId);
 

@@ -49,16 +49,16 @@ public class StorageService {
 
         if (fullPath.endsWith("/")) {
             if (minioStorageClient.exists(fullPath)) {
-                return resourceMapper.mapToDto(normalized, null, ResourceType.DIRECTORY);
+                return ResourceMapper.mapToDto(normalized, null, ResourceType.DIRECTORY);
             }
         } else {
             var metadata = minioStorageClient.getMetadata(fullPath);
             if (metadata != null) {
-                return resourceMapper.mapToDto(normalized, metadata.size(), ResourceType.FILE);
+                return ResourceMapper.mapToDto(normalized, metadata.size(), ResourceType.FILE);
             }
 
             if (minioStorageClient.exists(fullPath + "/")) {
-                return resourceMapper.mapToDto(normalized + "/", null, ResourceType.DIRECTORY);
+                return ResourceMapper.mapToDto(normalized + "/", null, ResourceType.DIRECTORY);
             }
         }
 
@@ -75,9 +75,8 @@ public class StorageService {
         validateParentExists(normalized, userId);
         minioStorageClient.createFolder(fullPath);
 
-        return resourceMapper.mapToDto(normalized, null, ResourceType.DIRECTORY);
+        return ResourceMapper.mapToDto(normalized, null, ResourceType.DIRECTORY);
     }
-
 
 
     public List<ResourceDto> uploadFiles(String path, List<MultipartFile> files, Long userId) {
@@ -102,7 +101,7 @@ public class StorageService {
                             minioStorageClient.putFile(fullPath, is, file.getSize(), file.getContentType());
                         }
 
-                        return resourceMapper.mapToDto(normalizedPath + filename, file.getSize(), ResourceType.FILE);
+                        return ResourceMapper.mapToDto(normalizedPath + filename, file.getSize(), ResourceType.FILE);
                     } catch (FileAlreadyExistsException e) {
                         throw e;
                     } catch (Exception e) {
@@ -132,7 +131,7 @@ public class StorageService {
             try {
                 Item item = result.get();
                 if (item.objectName().equals(fullPath)) continue;
-                dtos.add(resourceMapper.mapToResourceDto(item, userId));
+                dtos.add(ResourceMapper.mapToResourceDto(item, userId));
             } catch (Exception e) {
                 log.error("Error while getting listItems for user {} ", userId, e);
                 throw new RuntimeException("ListItems error");
@@ -164,7 +163,7 @@ public class StorageService {
             }
 
             try {
-            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+                CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
             } catch (CompletionException e) {
                 throw new StorageException("Partial delete failure", (Exception) e.getCause());
             }
@@ -241,7 +240,7 @@ public class StorageService {
                     return fileName.toLowerCase().contains(lowerQuery);
                 })
 
-                .map(item -> resourceMapper.mapToResourceDto(item, userId))
+                .map(item -> ResourceMapper.mapToResourceDto(item, userId))
 
                 .collect(Collectors.toList());
     }

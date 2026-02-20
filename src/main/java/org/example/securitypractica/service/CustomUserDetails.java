@@ -17,11 +17,10 @@ import java.util.Collections;
 @AllArgsConstructor
 public class CustomUserDetails implements UserDetails, Serializable {
     private static final long serialVersionUID = 1L;
-
-    private Long id;
-    private String username;
     private final String password;
     private final Collection<? extends GrantedAuthority> authorities;
+    private Long id;
+    private String username;
 
     public CustomUserDetails(User user) {
         this.id = user.getId();
@@ -29,6 +28,7 @@ public class CustomUserDetails implements UserDetails, Serializable {
         this.password = user.getPassword();
         this.authorities = Collections.singletonList(new SimpleGrantedAuthority(user.getRole()));
     }
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return authorities;

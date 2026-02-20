@@ -16,7 +16,7 @@ public class MinioStorageClient {
     private final MinioClient minioClient;
     private final MinioProperties minioProperties;
 
-    public MinioStorageClient(MinioClient minioClient,  MinioProperties minioProperties) {
+    public MinioStorageClient(MinioClient minioClient, MinioProperties minioProperties) {
         this.minioClient = minioClient;
         this.minioProperties = minioProperties;
     }
@@ -141,8 +141,8 @@ public class MinioStorageClient {
             return minioClient.getObject(
                     GetObjectArgs.builder()
                             .bucket(minioProperties.getBucketName())
-                        .object(objectName)
-                        .build());
+                            .object(objectName)
+                            .build());
         } catch (Exception e) {
             throw new StorageException("Failed to get stream from MinIO", e);
         }
