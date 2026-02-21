@@ -1,4 +1,4 @@
-package org.example.securitypractica.controller;
+package org.example.securitypractica.handler;
 
 import org.example.securitypractica.dto.ErrorResponse;
 import org.example.securitypractica.exception.*;
@@ -19,7 +19,7 @@ public class GlobalExceptionHandler {
         return new ErrorResponse(ex.getMessage(), LocalDateTime.now());
     }
 
-    @ExceptionHandler({InvalidPathException.class, MethodArgumentNotValidException.class, MyBadRequestException.class})
+    @ExceptionHandler({InvalidPathException.class, MethodArgumentNotValidException.class, BadRequestException.class})
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ErrorResponse handleBadRequest(Exception ex) {
         String message = ex instanceof MethodArgumentNotValidException ? "Validation failed" : ex.getMessage();
@@ -42,5 +42,11 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ErrorResponse handleGlobal(Exception ex) {
         return new ErrorResponse("Internal server error: " + ex.getMessage(), LocalDateTime.now());
+    }
+
+    @ExceptionHandler(UsernameExistsException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleUsernameExistsException(UsernameExistsException ex) {
+        return new ErrorResponse(ex.getMessage(), LocalDateTime.now());
     }
 }

@@ -5,24 +5,19 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpSession;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.example.securitypractica.dto.RegistrationDto;
 import org.example.securitypractica.dto.RegistrationResponseDto;
-import org.example.securitypractica.dto.UserMeResponseDto;
-import org.example.securitypractica.entity.User;
-import org.example.securitypractica.exception.InvalidCredentialsException;
 import org.example.securitypractica.service.AuthService;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authentication.InternalAuthenticationServiceException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.web.bind.annotation.*;
-
-import java.security.Principal;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -31,10 +26,12 @@ public class AuthController {
 
     private final AuthService authService;
     private final AuthenticationManager authenticationManager;
+    private final SecurityContextRepository securityContextRepository;
 
-    public AuthController(AuthService authService, AuthenticationManager authenticationManager) {
+    public AuthController(AuthService authService, AuthenticationManager authenticationManager, SecurityContextRepository securityContextRepository) {
         this.authService = authService;
         this.authenticationManager = authenticationManager;
+        this.securityContextRepository = securityContextRepository;
     }
 
 
@@ -45,12 +42,12 @@ public class AuthController {
     })
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("/sign-up")
-    public RegistrationResponseDto registration(@RequestBody @Valid RegistrationDto registrationDto) {
-        User user = new User(registrationDto.getUsername(), registrationDto.getPassword());
-        User savedUser = authService.register(user);
-        return new RegistrationResponseDto(savedUser.getUsername());
-    }
+    public RegistrationResponseDto registration(@RequestBody @Valid RegistrationDto registrationDto, HttpServletRequest request, HttpServletResponse response) {
+        RegistrationResponseDto registrationResponseDto = authService.register(registrationDto);
+        authenticateAndSaveContext(registrationDto, request, response);
 
+        return registrationResponseDto;
+    }
 
     @Operation(summary = "Вход в систему (получение сессии)")
     @ApiResponses(value = {
@@ -58,29 +55,23 @@ public class AuthController {
             @ApiResponse(responseCode = "401", description = "Неверные учетные данные")
     })
     @PostMapping("/sign-in")
-    public RegistrationResponseDto signIn(@RequestBody RegistrationDto registrationDto, HttpServletRequest request) {
-        try {
-            UsernamePasswordAuthenticationToken authenticationToken =
-                    new UsernamePasswordAuthenticationToken(registrationDto.getUsername(), registrationDto.getPassword());
+    public RegistrationResponseDto signIn(@RequestBody @Valid RegistrationDto registrationDto, HttpServletRequest request, HttpServletResponse response) {
+        authenticateAndSaveContext(registrationDto, request, response);
 
-            Authentication authentication = authenticationManager.authenticate(authenticationToken);
-
-            SecurityContextHolder.getContext().setAuthentication(authentication);
-
-            HttpSession session = request.getSession(true);
-            session.setAttribute("SPRING_SECURITY_CONTEXT", SecurityContextHolder.getContext());
-
-            return new RegistrationResponseDto(registrationDto.getUsername());
-
-        } catch (BadCredentialsException | InternalAuthenticationServiceException e) {
-            throw new InvalidCredentialsException("Invalid username or password");
-        }
+        return new RegistrationResponseDto(registrationDto.getUsername());
     }
 
-    @Operation(summary = "Получение информации о текущем пользователе")
-    @GetMapping("/me")
-    public UserMeResponseDto getCurrentUser(Principal principal) {
-        return new UserMeResponseDto(principal.getName());
+    private void authenticateAndSaveContext(RegistrationDto registrationDto, HttpServletRequest request, HttpServletResponse response) {
+        UsernamePasswordAuthenticationToken authenticationToken =
+                new UsernamePasswordAuthenticationToken(registrationDto.getUsername(), registrationDto.getUsername());
+
+        Authentication authentication = authenticationManager.authenticate(authenticationToken);
+
+        SecurityContext context = SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(authentication);
+        SecurityContextHolder.setContext(context);
+
+        securityContextRepository.saveContext(context, request, response);
     }
 }
 
