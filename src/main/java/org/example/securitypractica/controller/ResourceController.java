@@ -7,7 +7,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.example.securitypractica.dto.ResourceDto;
-import org.example.securitypractica.exception.MyBadRequestException;
+import org.example.securitypractica.exception.BadRequestException;
 import org.example.securitypractica.service.StorageService;
 import org.example.securitypractica.service.UserService;
 import org.springframework.http.HttpHeaders;
@@ -52,11 +52,13 @@ public class ResourceController {
 
     @Operation(summary = "Перемещение или переименование", description = "Переносит ресурс (файл или папку) по новому пути.")
     @PutMapping("/move")
-    public void move(
+    public ResourceDto move(
             @RequestParam String from,
             @RequestParam String to,
             Principal principal) {
         storageService.move(from, to, getUserId(principal));
+        return storageService.getResource(to, getUserId(principal));
+
     }
 
     @Operation(summary = "Поиск", description = "Глобальный поиск файлов и папок по части имени.")
@@ -74,7 +76,7 @@ public class ResourceController {
             Principal principal) {
 
         if (files == null || files.isEmpty()) {
-            throw new MyBadRequestException("No files selected for upload");
+            throw new BadRequestException("No files selected for upload");
         }
         return storageService.uploadFiles(path, files, getUserId(principal));
     }
